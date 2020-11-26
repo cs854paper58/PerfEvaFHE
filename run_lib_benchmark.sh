@@ -1,9 +1,9 @@
 #!/bin/bash
 
-NUMCORE=2
+NUMCORE=4
 
 CMD=cmake-build-release/bin/benchmark/lib-benchmark
-REPEAT=2
+REPEAT=10
 
 RESULTFOLDER=./result
 FORMAT=csv
@@ -13,6 +13,8 @@ BENCHMARKS=("BFVrns_KeyGen" "BFVrns_MultKeyGen"
 	"CKKS_KeyGen" "CKKS_MultKeyGen" "CKKS_EvalAtIndexKeyGen" "CKKS_Encryption" "CKKS_Decryption" "CKKS_Add" "CKKS_MultNoRelin" "CKKS_MultRelin" \
 	"CKKS_EvalAtIndex" "BGVrns_KeyGen" "BGVrns_MultKeyGen" "BGVrns_EvalAtIndexKeyGen" "BGVrns_Encryption" "BGVrns_Decryption" "BGVrns_Add" \
 	"BGVrns_MultNoRelin" "BGVrns_MultRelin" "BGVrns_EvalAtIndex" )
+
+BENCHMARKS=("BFV" "BGV" "CKKS")
 
 if [ -d "$RESULTFOLDER" ]; then
     echo "File exists"
@@ -28,6 +30,6 @@ do
 	for j in ${!BENCHMARKS[@]};
 	do
 		benchmark=${BENCHMARKS[$j]}
-		$CMD --benchmark_repetitions=$REPEAT --benchmark_out=./$RESULTFOLDER/result_${benchmark}_$NUMCORE.$FORMAT --benchmark_out_format=$FORMAT --benchmark_filter=$benchmark
+		$CMD --benchmark_repetitions=$REPEAT --benchmark_out=./$RESULTFOLDER/result_${benchmark}_$i.$FORMAT --benchmark_out_format=$FORMAT --benchmark_filter=$benchmark
 	done
 done
