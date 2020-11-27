@@ -14,7 +14,7 @@ BENCHMARKS=("BFVrns_KeyGen" "BFVrns_MultKeyGen"
 	"CKKS_EvalAtIndex" "BGVrns_KeyGen" "BGVrns_MultKeyGen" "BGVrns_EvalAtIndexKeyGen" "BGVrns_Encryption" "BGVrns_Decryption" "BGVrns_Add" \
 	"BGVrns_MultNoRelin" "BGVrns_MultRelin" "BGVrns_EvalAtIndex" )
 
-BENCHMARKS=("BFV" "BGV" "CKKS")
+BENCHMARKS=("BFV" "BGV" "IntCKKS")
 
 if [ -d "$RESULTFOLDER" ]; then
     echo "File exists"
