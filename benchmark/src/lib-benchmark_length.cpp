@@ -54,11 +54,15 @@ using namespace lbcrypto;
  * Context setup utility methods
  */
 
+int a = 10;
+int b = 100;
+usint my_ptm = 200;
+
 CryptoContext<DCRTPoly> GenerateBFVrnsContext() {
-  usint ptm = 2;
+  usint ptm = my_ptm;
   double sigma = 3.19;
   double rootHermiteFactor = 1.0048;
-
+//  SecurityLevel rootHermiteFactor = HEStd_128_classic;
   size_t count = 100;
 
   // Set Crypto Parameters
@@ -103,7 +107,7 @@ CryptoContext<DCRTPoly> GenerateCKKSContext() {
 CryptoContext<DCRTPoly> GenerateBGVrnsContext() {
   usint cyclOrder = 8192;
   usint numPrimes = 2;
-  usint ptm = 2;
+  usint ptm = my_ptm;
   usint relinWindow = 0;
 
   // Get BGVrns crypto context and generate encryption keys.
@@ -262,7 +266,7 @@ void BFVrns_Encryption(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cryptoContext->KeyGen();
   
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
 
   for(int i=0; i< state.range(0);i++){
@@ -285,7 +289,7 @@ void BFVrns_Decryption(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cryptoContext->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
 
   for(int i=0; i< state.range(0);i++){
@@ -311,7 +315,7 @@ void BFVrns_Add(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cc->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -341,7 +345,7 @@ void BFVrns_MultNoRelin(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cryptoContext->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -373,7 +377,7 @@ void BFVrns_MultRelin(benchmark::State &state) {
   cryptoContext->EvalMultKeyGen(keyPair.secretKey);
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -411,7 +415,7 @@ void BFVrns_EvalAtIndex(benchmark::State &state) {
   cc->EvalAtIndexKeyGen(keyPair.secretKey, indexList);
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -441,7 +445,7 @@ BENCHMARK(BFVrns_EvalAtIndex)->RANGE->Unit(benchmark::kMicrosecond);
  * CKKS benchmarks
  * */
 
-void CKKS_KeyGen(benchmark::State &state) {
+void IntCKKS_KeyGen(benchmark::State &state) {
   CryptoContext<DCRTPoly> cryptoContext = GenerateCKKSContext();
 
   LPKeyPair<DCRTPoly> keyPair;
@@ -451,9 +455,9 @@ void CKKS_KeyGen(benchmark::State &state) {
   }
 }
 
-BENCHMARK(CKKS_KeyGen)->Unit(benchmark::kMicrosecond);
+BENCHMARK(IntCKKS_KeyGen)->Unit(benchmark::kMicrosecond);
 
-void CKKS_MultKeyGen(benchmark::State &state) {
+void IntCKKS_MultKeyGen(benchmark::State &state) {
   CryptoContext<DCRTPoly> cc = GenerateCKKSContext();
 
   LPKeyPair<DCRTPoly> keyPair;
@@ -464,7 +468,7 @@ void CKKS_MultKeyGen(benchmark::State &state) {
   }
 }
 
-BENCHMARK(CKKS_MultKeyGen)->Unit(benchmark::kMicrosecond);
+BENCHMARK(IntCKKS_MultKeyGen)->Unit(benchmark::kMicrosecond);
 
 void IntCKKS_EvalAtIndexKeyGen(benchmark::State &state) {
   CryptoContext<DCRTPoly> cc = GenerateCKKSContext();
@@ -496,8 +500,11 @@ void IntCKKS_Encryption(benchmark::State &state) {
 //  }
   std::vector<std::complex<double>> vectorOfInts(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts[i] = 1 * i;
+    vectorOfInts[i] = distribution(generator);
   }
 
   auto plaintext = cc->MakeCKKSPackedPlaintext(vectorOfInts);
@@ -519,9 +526,11 @@ void IntCKKS_Decryption(benchmark::State &state) {
 //    vectorOfInts1[i] = 1 * i;
 //  }
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
 
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
   }
 
   auto plaintext1 = cc->MakeCKKSPackedPlaintext(vectorOfInts1);
@@ -554,9 +563,12 @@ void IntCKKS_Add(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
   auto plaintext1 = cc->MakeCKKSPackedPlaintext(vectorOfInts1);
@@ -589,9 +601,12 @@ void IntCKKS_MultNoRelin(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
 
@@ -626,9 +641,12 @@ void IntCKKS_MultRelin(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
   auto plaintext1 = cc->MakeCKKSPackedPlaintext(vectorOfInts1);
@@ -662,9 +680,12 @@ void IntCKKS_Relin(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
   auto plaintext1 = cc->MakeCKKSPackedPlaintext(vectorOfInts1);
@@ -700,9 +721,12 @@ void IntCKKS_Rescale(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
   auto plaintext1 = cc->MakeCKKSPackedPlaintext(vectorOfInts1);
@@ -745,9 +769,12 @@ void IntCKKS_EvalAtIndex(benchmark::State &state) {
   std::vector<std::complex<double>> vectorOfInts1(state.range(0));
   std::vector<std::complex<double>> vectorOfInts2(state.range(0));
 
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
   for(int i=0; i< state.range(0);i++){
-    vectorOfInts1[i] = 1 * i;
-    vectorOfInts2[i] = 1 * i;
+    vectorOfInts1[i] = distribution(generator);
+    vectorOfInts2[i] = distribution(generator);
   }
 
 
@@ -819,7 +846,7 @@ void BGVrns_Encryption(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cryptoContext->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts(state.range(0));
 
   for(int i=0; i< state.range(0);i++){
@@ -841,7 +868,7 @@ void BGVrns_Decryption(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cc->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts(state.range(0));
 
   for(int i=0; i< state.range(0);i++){
@@ -868,7 +895,7 @@ void BGVrns_Add(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cc->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -898,7 +925,7 @@ void BGVrns_MultNoRelin(benchmark::State &state) {
   LPKeyPair<DCRTPoly> keyPair = cc->KeyGen();
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -929,7 +956,7 @@ void BGVrns_MultRelin(benchmark::State &state) {
   cc->EvalMultKeyGen(keyPair.secretKey);
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -960,7 +987,7 @@ void BGVrns_Relin(benchmark::State &state) {
   cc->EvalMultKeyGen(keyPair.secretKey);
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){
@@ -1000,7 +1027,7 @@ void BGVrns_EvalAtIndex(benchmark::State &state) {
   cc->EvalAtIndexKeyGen(keyPair.secretKey, indexList);
 
   std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(0,1);
+  std::uniform_int_distribution<int> distribution(a,b);
   std::vector<int64_t> vectorOfInts1(state.range(0));
   std::vector<int64_t> vectorOfInts2(state.range(0));
   for(int i=0; i< state.range(0);i++){

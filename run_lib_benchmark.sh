@@ -1,8 +1,8 @@
 #!/bin/bash
 
-NUMCORE=4
+NUMCORE=24
 
-CMD=cmake-build-release/bin/benchmark/lib-benchmark
+CMD=cmake-build-release/bin/benchmark/lib-benchmark_length
 REPEAT=10
 
 RESULTFOLDER=./result
@@ -30,6 +30,6 @@ do
 	for j in ${!BENCHMARKS[@]};
 	do
 		benchmark=${BENCHMARKS[$j]}
-		$CMD --benchmark_repetitions=$REPEAT --benchmark_out=./$RESULTFOLDER/result_${benchmark}_$i.$FORMAT --benchmark_out_format=$FORMAT --benchmark_filter=$benchmark
+		$CMD --benchmark_repetitions=$REPEAT --benchmark_out=./$RESULTFOLDER/result_${benchmark}_${i}.$FORMAT --benchmark_out_format=$FORMAT --benchmark_filter=$benchmark
 	done
 done
