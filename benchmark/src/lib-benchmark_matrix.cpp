@@ -31,6 +31,7 @@
 
 #define PROFILE
 #define _USE_MATH_DEFINES
+
 #include "benchmark/benchmark.h"
 
 #include <fstream>
@@ -51,252 +52,197 @@
 using namespace std;
 using namespace lbcrypto;
 
-#define ARG Arg(5)->Arg(6)
+#define ARG Arg(2)->Arg(3)->Arg(4)->Arg(5)->Arg(5)->Arg(7)->Arg(8)->Arg(9)->Arg(10)
 /*
  * Context setup utility methods
  */
 
 int a = 10;
-int b = 20;
+int b = 50;
 usint my_ptm = 50;
+int matrixSize = 10;
 
-CryptoContext<DCRTPoly> GenerateBFVrnsContext() {
-  usint ptm = my_ptm;
-  double sigma = 3.19;
-  double rootHermiteFactor = 1.0048;
-//  SecurityLevel rootHermiteFactor = HEStd_128_classic;
-  size_t count = 100;
+int64_t ArbBGVInnerProductPackedArray(std::vector<int64_t> &input1,
+                                      std::vector<int64_t> &input2) {
+  usint m = 22;
+  PlaintextModulus p = 89;
+  BigInteger modulusP(p);
 
-  // Set Crypto Parameters
-  CryptoContext<DCRTPoly> cryptoContext =
-          CryptoContextFactory<DCRTPoly>::genCryptoContextBFVrns(
-                  ptm, rootHermiteFactor, sigma, 0, 5, 0, MODE::OPTIMIZED, 3, 30, 55);
+  BigInteger modulusQ("955263939794561");
+  BigInteger squareRootOfRoot("941018665059848");
 
-  // enable features that you wish to use
-  cryptoContext->Enable(PKESchemeFeature::ENCRYPTION);
-  cryptoContext->Enable(PKESchemeFeature::SHE);
+  BigInteger bigmodulus("80899135611688102162227204937217");
+  BigInteger bigroot("77936753846653065954043047918387");
 
-  //	std::cout << "\np = " <<
-  // cryptoContext->GetCryptoParameters()->GetPlaintextModulus() << std::endl;
-  //	std::cout << "n = " <<
-  // cryptoContext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder()
-  /// 2 << std::endl; 	std::cout << "log2 q = " <<
-  // log2(cryptoContext->GetCryptoParameters()->GetElementParams()->GetModulus().ConvertToDouble())
-  //<< std::endl;
+  auto cycloPoly = GetCyclotomicPolynomial<BigVector>(m, modulusQ);
+  ChineseRemainderTransformArb<BigVector>::SetCylotomicPolynomial(cycloPoly,
+                                                                  modulusQ);
 
-  return cryptoContext;
-}
+  float stdDev = 4;
 
-CryptoContext<DCRTPoly> GenerateCKKSContext() {
-  usint cyclOrder = 8192;
-  usint numPrimes = 2;
-  usint scaleExp = 50;
-  usint relinWindow = 0;
-  int slots = 8;
+  usint batchSize = 8;
 
-  // Get CKKS crypto context and generate encryption keys.
-  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextCKKSWithParamsGen(
-          cyclOrder, numPrimes, scaleExp, relinWindow, slots, MODE::OPTIMIZED, 1, 5,
-          60, KeySwitchTechnique::GHS);
+  auto params = std::make_shared<ILParams>(m, modulusQ, squareRootOfRoot,
+                                           bigmodulus, bigroot);
 
-  cc->Enable(PKESchemeFeature::ENCRYPTION);
-  cc->Enable(PKESchemeFeature::SHE);
-  cc->Enable(PKESchemeFeature::LEVELEDSHE);
+  EncodingParams encodingParams(std::make_shared<EncodingParamsImpl>(
+          p, batchSize, PackedEncoding::GetAutomorphismGenerator(m)));
 
-  return cc;
-}
+  PackedEncoding::SetParams(m, encodingParams);
 
-CryptoContext<DCRTPoly> GenerateBGVrnsContext() {
-  usint cyclOrder = 8192;
-  usint numPrimes = 2;
-  usint ptm = my_ptm;
-  usint relinWindow = 0;
-
-  // Get BGVrns crypto context and generate encryption keys.
-  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextBGVrnsWithParamsGen(
-          cyclOrder, numPrimes, ptm, relinWindow, OPTIMIZED, 1, 1, GHS);
+  CryptoContext<Poly> cc = CryptoContextFactory<Poly>::genCryptoContextBGV(
+          params, encodingParams, 8, stdDev);
 
   cc->Enable(ENCRYPTION);
   cc->Enable(SHE);
-  cc->Enable(LEVELEDSHE);
 
-  return cc;
-}
+  // Initialize the public key containers.
+  LPKeyPair<Poly> kp = cc->KeyGen();
 
-void BFV_MatrixMul(benchmark::State &state){
+  Ciphertext<Poly> ciphertext1;
+  Ciphertext<Poly> ciphertext2;
 
-//  int numRow = state.range(0);
-//  int numCol = state.range(0);
+  std::vector<int64_t> vectorOfInts1 = std::move(input1);
+  std::vector<int64_t> vectorOfInts2 = std::move(input2);
 
-  usint ptm = my_ptm;
-  double sigma = 3.19;
-  double rootHermiteFactor = 1.0048;
-//  SecurityLevel rootHermiteFactor = HEStd_128_classic;
-  size_t count = 100;
+  Plaintext intArray1 = cc->MakePackedPlaintext(vectorOfInts1);
+  Plaintext intArray2 = cc->MakePackedPlaintext(vectorOfInts2);
 
-  // Set Crypto Parameters
-  auto cc =
-          CryptoContextFactory<DCRTPoly>::genCryptoContextBFVrns(
-                  ptm, rootHermiteFactor, sigma, 0, 5, 0, MODE::OPTIMIZED, 3, 30, 55);
-
-  // enable features that you wish to use
-  cc->Enable(PKESchemeFeature::ENCRYPTION);
-  cc->Enable(PKESchemeFeature::SHE);
-
-
-  auto kp = cc->KeyGen();
+  cc->EvalSumKeyGen(kp.secretKey);
   cc->EvalMultKeyGen(kp.secretKey);
 
-  auto zeroAlloc = [=]() { return Plaintext(); };
+  ciphertext1 = cc->Encrypt(kp.publicKey, intArray1);
+  ciphertext2 = cc->Encrypt(kp.publicKey, intArray2);
 
-  std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(a,b);
+  auto result = cc->EvalInnerProduct(ciphertext1, ciphertext2, batchSize);
 
-  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, 2, 2);
-  std::vector<int64_t> vectorOfInts1 = {1, 0, 1, 1, 0, 1, 0, 1};
-  xP(0, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts1);
+  Plaintext intArrayNew;
 
-  std::vector<int64_t> vectorOfInts2 = {1, 1, 0, 1, 0, 1, 1, 0};
-  xP(0, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts2);
+  cc->Decrypt(kp.secretKey, result, &intArrayNew);
 
-  std::vector<int64_t> vectorOfInts3 = {1, 1, 1, 1, 0, 1, 0, 1};
-  xP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts3);
-
-  std::vector<int64_t> vectorOfInts4 = {1, 0, 0, 1, 0, 1, 1, 0};
-  xP(1, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts4);
-
-  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, 2, 2);
-
-  std::vector<int64_t> vectorOfInts5 = {1, 1, 1, 0, 0, 1, 0, 1};
-  yP(0, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts5);
-
-  std::vector<int64_t> vectorOfInts6 = {1, 0, 0, 1, 0, 1, 1, 0};
-  yP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts6);
-
-  std::vector<int64_t> vectorOfInts7 = {1, 1, 1, 1, 0, 1, 0, 1};
-  xP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts3);
-
-  std::vector<int64_t> vectorOfInts8 = {1, 0, 0, 1, 0, 1, 1, 0};
-  xP(1, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts4);
-//  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-//  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-//
-//  for(int i=0;i<numRow;i++){
-//    for (int j=0; j<numCol;j++){
-//      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-//      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-//    }
-//  }
-
-  auto x = cc->EncryptMatrix(kp.publicKey, xP);
-
-  auto y = cc->EncryptMatrix(kp.publicKey, yP);
-
-  while (state.KeepRunning()) {
-    auto result = cc->EvalMult(x, y);
-  }
-
+  return intArrayNew->GetPackedValue()[0];
 }
-BENCHMARK(BFV_MatrixMul)->Unit(benchmark::kMicrosecond);
 
-void BGV_MatrixMul(benchmark::State &state){
+int64_t ArbBFVInnerProductPackedArray(std::vector<int64_t> &input1,
+                                      std::vector<int64_t> &input2) {
+  usint m = 22;
+  PlaintextModulus p = 2333;  // we choose s.t. 2m|p-1 to leverage CRTArb
+  BigInteger modulusQ("1152921504606847009");
+  BigInteger modulusP(p);
+  BigInteger rootOfUnity("1147559132892757400");
 
-  int numRow = state.range(0);
-  int numCol = state.range(0);
+  BigInteger bigmodulus("42535295865117307932921825928971026753");
+  BigInteger bigroot("13201431150704581233041184864526870950");
 
-  usint cyclOrder = 8192;
-  usint numPrimes = 2;
-  usint ptm = my_ptm;
-  usint relinWindow = 0;
-  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextBGVrnsWithParamsGen(
-          cyclOrder, numPrimes, ptm, relinWindow, OPTIMIZED, 1, 1, GHS);
+  auto cycloPoly = GetCyclotomicPolynomial<BigVector>(m, modulusQ);
+  ChineseRemainderTransformArb<BigVector>::SetCylotomicPolynomial(cycloPoly,
+                                                                  modulusQ);
+
+  float stdDev = 4;
+  auto params =
+          std::make_shared<ILParams>(m, modulusQ, rootOfUnity, bigmodulus, bigroot);
+
+  BigInteger bigEvalMultModulus("42535295865117307932921825928971026753");
+  BigInteger bigEvalMultRootOfUnity("22649103892665819561201725524201801241");
+  BigInteger bigEvalMultModulusAlt(
+          "115792089237316195423570985008687907853269984665640564039457584007913129"
+          "642241");
+  BigInteger bigEvalMultRootOfUnityAlt(
+          "378615503042744655685234439862468415306448471137816667281217177222856678"
+          "62085");
+
+  auto cycloPolyBig = GetCyclotomicPolynomial<BigVector>(m, bigEvalMultModulus);
+  ChineseRemainderTransformArb<BigVector>::SetCylotomicPolynomial(
+          cycloPolyBig, bigEvalMultModulus);
+
+  usint batchSize = 8;
+
+  EncodingParams encodingParams(std::make_shared<EncodingParamsImpl>(
+          p, batchSize, PackedEncoding::GetAutomorphismGenerator(m)));
+
+  PackedEncoding::SetParams(m, encodingParams);
+
+  BigInteger delta(modulusQ.DividedBy(modulusP));
+
+  CryptoContext<Poly> cc = CryptoContextFactory<Poly>::genCryptoContextBFV(
+          params, encodingParams, 1, stdDev, delta.ToString(), OPTIMIZED,
+          bigEvalMultModulus.ToString(), bigEvalMultRootOfUnity.ToString(), 1, 9,
+          1.006, bigEvalMultModulusAlt.ToString(),
+          bigEvalMultRootOfUnityAlt.ToString());
 
   cc->Enable(ENCRYPTION);
   cc->Enable(SHE);
-  cc->Enable(LEVELEDSHE);
 
-  LPKeyPair<DCRTPoly> kp = cc->KeyGen();
+  // Initialize the public key containers.
+  LPKeyPair<Poly> kp = cc->KeyGen();
+
+  Ciphertext<Poly> ciphertext1;
+  Ciphertext<Poly> ciphertext2;
+
+  std::vector<int64_t> vectorOfInts1 = std::move(input1);
+  std::vector<int64_t> vectorOfInts2 = std::move(input2);
+
+  Plaintext intArray1 = cc->MakePackedPlaintext(vectorOfInts1);
+  Plaintext intArray2 = cc->MakePackedPlaintext(vectorOfInts2);
+
+  cc->EvalSumKeyGen(kp.secretKey);
   cc->EvalMultKeyGen(kp.secretKey);
 
-  auto zeroAlloc = [=]() { return Plaintext(); };
+  ciphertext1 = cc->Encrypt(kp.publicKey, intArray1);
+  ciphertext2 = cc->Encrypt(kp.publicKey, intArray2);
 
-  std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(a,b);
+  auto result = cc->EvalInnerProduct(ciphertext1, ciphertext2, batchSize);
 
-  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+  Plaintext intArrayNew;
 
-  for(int i=0;i<numRow;i++){
-    for (int j=0; j<numCol;j++){
-      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-    }
-  }
+  cc->Decrypt(kp.secretKey, result, &intArrayNew);
 
-  auto x = cc->EncryptMatrix(kp.publicKey, xP);
-
-  auto y = cc->EncryptMatrix(kp.publicKey, yP);
-
-  ////////////////////////////////////////////////////////////
-  // Linear Regression
-  ////////////////////////////////////////////////////////////
-  while (state.KeepRunning()) {
-    auto result = cc->EvalMult(x, y);
-  }
-
+  return intArrayNew->GetPackedValue()[0];
 }
-BENCHMARK(BGV_MatrixMul)->ARG->Unit(benchmark::kMicrosecond);
 
+void BGV_EvalInnerProduct(benchmark::State &state) {
+  usint size = state.range(0);
+  std::vector<int64_t> input1(size, 0);
+  std::vector<int64_t> input2(size, 0);
+  PRNG rand_engine(1);
 
-void CKKS_MatrixMul(benchmark::State &state){
+  uniform_int_distribution<usint> dist(a, b);
 
-  int numRow = state.range(0);
-  int numCol = state.range(0);
+  auto gen = std::bind(dist, rand_engine);
+  generate(input1.begin(), input1.end() - 2, gen);
+  generate(input2.begin(), input2.end() - 2, gen);
 
-  usint cyclOrder = 8192;
-  usint numPrimes = 2;
-  usint scaleExp = 50;
-  usint relinWindow = 0;
-  int slots = 8;
-
-  // Get CKKS crypto context and generate encryption keys.
-  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextCKKSWithParamsGen(
-          cyclOrder, numPrimes, scaleExp, relinWindow, slots, MODE::OPTIMIZED, 1, 5,
-          60, KeySwitchTechnique::GHS);
-
-  cc->Enable(PKESchemeFeature::ENCRYPTION);
-  cc->Enable(PKESchemeFeature::SHE);
-  cc->Enable(PKESchemeFeature::LEVELEDSHE);
-
-
-  LPKeyPair<DCRTPoly> kp = cc->KeyGen();
-  cc->EvalMultKeyGen(kp.secretKey);
-
-  auto zeroAlloc = [=]() { return Plaintext(); };
-
-  std::default_random_engine generator;
-  std::uniform_int_distribution<int> distribution(a,b);
-
-  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-
-  for(int i=0;i<numRow;i++){
-    for (int j=0; j<numCol;j++){
-      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-    }
-  }
-
-  auto x = cc->EncryptMatrix(kp.publicKey, xP);
-
-  auto y = cc->EncryptMatrix(kp.publicKey, yP);
+  int loop = size*size;
 
   while (state.KeepRunning()) {
-    auto result = cc->EvalMult(x, y);
+    for(int i=0;i<loop;i++) {
+      int64_t result = ArbBGVInnerProductPackedArray(input1, input2);
+    }
   }
-
 }
-BENCHMARK(CKKS_MatrixMul)->ARG->Unit(benchmark::kMicrosecond);
+BENCHMARK(BGV_EvalInnerProduct)->ARG->Unit(benchmark::kMillisecond);
+
+void BFV_EvalInnerProduct(benchmark::State &state) {
+  usint size = state.range(0);
+  std::vector<int64_t> input1(size, 0);
+  std::vector<int64_t> input2(size, 0);
+
+  PRNG rand_engine(1);
+  uniform_int_distribution<usint> dist(a, b);;
+
+  auto gen = std::bind(dist, rand_engine);
+  generate(input1.begin(), input1.end() - 2, gen);
+  generate(input2.begin(), input2.end() - 2, gen);
+
+  int loop = size*size;
+
+  while (state.KeepRunning()) {
+    for(int i=0;i<loop;i++) {
+      int64_t result = ArbBFVInnerProductPackedArray(input1, input2);
+    }
+  }
+}
+BENCHMARK(BFV_EvalInnerProduct)->ARG->Unit(benchmark::kMillisecond);
 
 
 BENCHMARK_MAIN();
