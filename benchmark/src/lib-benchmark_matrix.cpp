@@ -51,14 +51,14 @@
 using namespace std;
 using namespace lbcrypto;
 
-#define RANGE RangeMultiplier(2)->Range(8, 8<<10)
+#define ARG Arg(5)->Arg(6)
 /*
  * Context setup utility methods
  */
 
 int a = 10;
-int b = 100;
-usint my_ptm = 200;
+int b = 20;
+usint my_ptm = 50;
 
 CryptoContext<DCRTPoly> GenerateBFVrnsContext() {
   usint ptm = my_ptm;
@@ -125,8 +125,8 @@ CryptoContext<DCRTPoly> GenerateBGVrnsContext() {
 
 void BFV_MatrixMul(benchmark::State &state){
 
-  int numRow = 3;
-  int numCol = 3;
+//  int numRow = state.range(0);
+//  int numCol = state.range(0);
 
   usint ptm = my_ptm;
   double sigma = 3.19;
@@ -143,13 +143,6 @@ void BFV_MatrixMul(benchmark::State &state){
   cc->Enable(PKESchemeFeature::ENCRYPTION);
   cc->Enable(PKESchemeFeature::SHE);
 
-//  usint plaintextModulus = 512;
-//  usint relWindow = 8;
-//  float stdDev = 4;
-//  CryptoContext<Poly> cc = CryptoContextFactory<Poly>::genCryptoContextBFV(
-//          plaintextModulus, 1.6, relWindow, stdDev, 0, 3, 0);
-//  cc->Enable(ENCRYPTION);
-//  cc->Enable(SHE);
 
   auto kp = cc->KeyGen();
   cc->EvalMultKeyGen(kp.secretKey);
@@ -159,27 +152,48 @@ void BFV_MatrixMul(benchmark::State &state){
   std::default_random_engine generator;
   std::uniform_int_distribution<int> distribution(a,b);
 
-  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
-  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, 2, 2);
+  std::vector<int64_t> vectorOfInts1 = {1, 0, 1, 1, 0, 1, 0, 1};
+  xP(0, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts1);
 
-  for(int i=0;i<numRow;i++){
-    for (int j=0; j<numCol;j++){
-      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
-    }
-  }
+  std::vector<int64_t> vectorOfInts2 = {1, 1, 0, 1, 0, 1, 1, 0};
+  xP(0, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts2);
 
-  auto x =
-          cc->EncryptMatrix(kp.publicKey, xP);
+  std::vector<int64_t> vectorOfInts3 = {1, 1, 1, 1, 0, 1, 0, 1};
+  xP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts3);
 
-  auto y =
-          cc->EncryptMatrix(kp.publicKey, yP);
+  std::vector<int64_t> vectorOfInts4 = {1, 0, 0, 1, 0, 1, 1, 0};
+  xP(1, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts4);
 
-  ////////////////////////////////////////////////////////////
-  // Linear Regression
-  ////////////////////////////////////////////////////////////
+  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, 2, 2);
+
+  std::vector<int64_t> vectorOfInts5 = {1, 1, 1, 0, 0, 1, 0, 1};
+  yP(0, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts5);
+
+  std::vector<int64_t> vectorOfInts6 = {1, 0, 0, 1, 0, 1, 1, 0};
+  yP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts6);
+
+  std::vector<int64_t> vectorOfInts7 = {1, 1, 1, 1, 0, 1, 0, 1};
+  xP(1, 0) = cc->MakeCoefPackedPlaintext(vectorOfInts3);
+
+  std::vector<int64_t> vectorOfInts8 = {1, 0, 0, 1, 0, 1, 1, 0};
+  xP(1, 1) = cc->MakeCoefPackedPlaintext(vectorOfInts4);
+//  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+//  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+//
+//  for(int i=0;i<numRow;i++){
+//    for (int j=0; j<numCol;j++){
+//      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
+//      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
+//    }
+//  }
+
+  auto x = cc->EncryptMatrix(kp.publicKey, xP);
+
+  auto y = cc->EncryptMatrix(kp.publicKey, yP);
+
   while (state.KeepRunning()) {
-    auto result = cc->EvalLinRegression(x, y);
+    auto result = cc->EvalMult(x, y);
   }
 
 }
@@ -187,24 +201,9 @@ BENCHMARK(BFV_MatrixMul)->Unit(benchmark::kMicrosecond);
 
 void BGV_MatrixMul(benchmark::State &state){
 
-  int numRow = 3;
-  int numCol = 3;
+  int numRow = state.range(0);
+  int numCol = state.range(0);
 
-//  usint m = 512;
-//
-//  float stdDev = 4;
-//  usint size = 4;
-//  usint plaintextmodulus = 256;
-//  usint relinWindow = 1;
-
-//  shared_ptr<ILDCRTParams<BigInteger>> params =
-//          GenerateDCRTParams<BigInteger>(m, size, 30);
-//
-//  CryptoContext<DCRTPoly> cc =
-//          CryptoContextFactory<DCRTPoly>::genCryptoContextBGV(
-//                  params, plaintextmodulus, relinWindow, stdDev);
-//  cc->Enable(ENCRYPTION);
-//  cc->Enable(SHE);
   usint cyclOrder = 8192;
   usint numPrimes = 2;
   usint ptm = my_ptm;
@@ -242,11 +241,62 @@ void BGV_MatrixMul(benchmark::State &state){
   // Linear Regression
   ////////////////////////////////////////////////////////////
   while (state.KeepRunning()) {
-    auto result = cc->EvalLinRegression(x, y);
+    auto result = cc->EvalMult(x, y);
   }
 
 }
-BENCHMARK(BGV_MatrixMul)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BGV_MatrixMul)->ARG->Unit(benchmark::kMicrosecond);
+
+
+void CKKS_MatrixMul(benchmark::State &state){
+
+  int numRow = state.range(0);
+  int numCol = state.range(0);
+
+  usint cyclOrder = 8192;
+  usint numPrimes = 2;
+  usint scaleExp = 50;
+  usint relinWindow = 0;
+  int slots = 8;
+
+  // Get CKKS crypto context and generate encryption keys.
+  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextCKKSWithParamsGen(
+          cyclOrder, numPrimes, scaleExp, relinWindow, slots, MODE::OPTIMIZED, 1, 5,
+          60, KeySwitchTechnique::GHS);
+
+  cc->Enable(PKESchemeFeature::ENCRYPTION);
+  cc->Enable(PKESchemeFeature::SHE);
+  cc->Enable(PKESchemeFeature::LEVELEDSHE);
+
+
+  LPKeyPair<DCRTPoly> kp = cc->KeyGen();
+  cc->EvalMultKeyGen(kp.secretKey);
+
+  auto zeroAlloc = [=]() { return Plaintext(); };
+
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
+  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, numRow, numCol);
+
+  for(int i=0;i<numRow;i++){
+    for (int j=0; j<numCol;j++){
+      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
+      yP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
+    }
+  }
+
+  auto x = cc->EncryptMatrix(kp.publicKey, xP);
+
+  auto y = cc->EncryptMatrix(kp.publicKey, yP);
+
+  while (state.KeepRunning()) {
+    auto result = cc->EvalMult(x, y);
+  }
+
+}
+BENCHMARK(CKKS_MatrixMul)->ARG->Unit(benchmark::kMicrosecond);
 
 
 BENCHMARK_MAIN();
