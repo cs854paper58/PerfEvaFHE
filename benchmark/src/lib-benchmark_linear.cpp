@@ -203,7 +203,7 @@ void CKKS_EvalLinRegression(benchmark::State &state){
 
   int num = state.range(0);
 
-  auto cc = GenerateBGVrnsContext();
+  auto cc = GenerateCKKSContext();
 
   auto kp = cc->KeyGen();
   cc->EvalMultKeyGen(kp.secretKey);
