@@ -106,7 +106,26 @@ CryptoContext<DCRTPoly> GenerateBGVrnsContext() {
   return cc;
 }
 
-void BFV_EvalInnerProduct(benchmark::State &state){
+CryptoContext<DCRTPoly> GenerateCKKSContext() {
+  usint cyclOrder = 8192;
+  usint numPrimes = 2;
+  usint scaleExp = 50;
+  usint relinWindow = 0;
+  int slots = 8;
+
+  // Get CKKS crypto context and generate encryption keys.
+  auto cc = CryptoContextFactory<DCRTPoly>::genCryptoContextCKKSWithParamsGen(
+          cyclOrder, numPrimes, scaleExp, relinWindow, slots, MODE::OPTIMIZED, 1, 5,
+          60, KeySwitchTechnique::GHS);
+
+  cc->Enable(PKESchemeFeature::ENCRYPTION);
+  cc->Enable(PKESchemeFeature::SHE);
+  cc->Enable(PKESchemeFeature::LEVELEDSHE);
+
+  return cc;
+}
+
+void BFV_EvalLinRegression(benchmark::State &state){
 
   int num = state.range(0);
 
@@ -141,9 +160,9 @@ void BFV_EvalInnerProduct(benchmark::State &state){
     cc->EvalLinRegression(x, y);
   }
 }
-BENCHMARK(BFV_EvalInnerProduct)->ARG->Unit(benchmark::kMillisecond);
+BENCHMARK(BFV_EvalLinRegression)->ARG->Unit(benchmark::kMillisecond);
 
-void BGV_EvalInnerProduct(benchmark::State &state){
+void BGV_EvalLinRegression(benchmark::State &state){
 
   int num = state.range(0);
 
@@ -178,8 +197,44 @@ void BGV_EvalInnerProduct(benchmark::State &state){
     cc->EvalLinRegression(x, y);
   }
 }
-BENCHMARK(BGV_EvalInnerProduct)->ARG->Unit(benchmark::kMillisecond);
+BENCHMARK(BGV_EvalLinRegression)->ARG->Unit(benchmark::kMillisecond);
 
+void CKKS_EvalLinRegression(benchmark::State &state){
+
+  int num = state.range(0);
+
+  auto cc = GenerateBGVrnsContext();
+
+  auto kp = cc->KeyGen();
+  cc->EvalMultKeyGen(kp.secretKey);
+
+  auto zeroAlloc = [=]() { return Plaintext(); };
+
+  std::default_random_engine generator;
+  std::uniform_int_distribution<int> distribution(a,b);
+
+  Matrix<Plaintext> xP = Matrix<Plaintext>(zeroAlloc, num, 2);
+  Matrix<Plaintext> yP = Matrix<Plaintext>(zeroAlloc, num, 1);
+
+  for(int i=0;i<num;i++){
+    for (int j=0; j<2;j++){
+      xP(i, j) = cc->MakeIntegerPlaintext(distribution(generator));
+    }
+    yP(i, 0) = cc->MakeIntegerPlaintext(distribution(generator));
+  }
+
+  auto x = cc->EncryptMatrix(kp.publicKey, xP);
+
+  auto y = cc->EncryptMatrix(kp.publicKey, yP);
+
+  ////////////////////////////////////////////////////////////
+  // Linear Regression
+  ////////////////////////////////////////////////////////////
+  while (state.KeepRunning()) {
+    cc->EvalLinRegression(x, y);
+  }
+}
+BENCHMARK(CKKS_EvalLinRegression)->ARG->Unit(benchmark::kMillisecond);
 
 
 
