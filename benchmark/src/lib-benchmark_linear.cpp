@@ -59,7 +59,7 @@ using namespace lbcrypto;
  */
 
 int a = 10;
-int b = 50;
+int b = 25;
 usint my_ptm = 100;
 
 CryptoContext<DCRTPoly> GenerateBFVrnsContext() {
